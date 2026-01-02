@@ -14,7 +14,7 @@ private_subnets = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
 ecr_repositories = ["awsdev-app"]
 
 kubernetes_version  = "1.29"
-node_instance_types = ["t3.medium"]
+node_instance_types = ["t3.small"]
 min_size            = 1
 desired_size        = 2
 max_size            = 3
