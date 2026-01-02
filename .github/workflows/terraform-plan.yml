@@ -1,0 +1,131 @@
+name: terraform-plan
+
+on:
+  pull_request:
+    paths:
+      - "modules/**"
+      - "live/**"
+      - "bootstrap/**"
+      - ".github/workflows/terraform-plan.yml"
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  plan-dev:
+    runs-on: ubuntu-latest
+    environment: dev
+    defaults:
+      run:
+        working-directory: live
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Terraform Init
+        run: terraform init -input=false
+
+      - name: Select workspace
+        run: terraform workspace select "${{ vars.TF_WORKSPACE }}" || terraform workspace new "${{ vars.TF_WORKSPACE }}"
+
+      - name: Terraform Fmt
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: terraform plan -input=false -no-color -var-file="${{ vars.TFVARS_FILE }}" -out=tfplan
+
+      - name: Show Plan
+        run: terraform show -no-color tfplan > plan.txt
+
+      - name: Comment PR with Plan (dev)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('live/plan.txt', 'utf8');
+            const body = `## Terraform Plan (dev workspace: ${{ vars.TF_WORKSPACE }})\n\n\`\`\`\n${plan.substring(0, 65000)}\n\`\`\``;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });
+
+  plan-staging:
+    runs-on: ubuntu-latest
+    environment: staging
+    defaults:
+      run:
+        working-directory: live
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - run: terraform init -input=false
+      - run: terraform workspace select "${{ vars.TF_WORKSPACE }}" || terraform workspace new "${{ vars.TF_WORKSPACE }}"
+      - run: terraform validate
+      - run: terraform plan -input=false -no-color -var-file="${{ vars.TFVARS_FILE }}" -out=tfplan
+      - run: terraform show -no-color tfplan > plan.txt
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('live/plan.txt', 'utf8');
+            const body = `## Terraform Plan (staging workspace: ${{ vars.TF_WORKSPACE }})\n\n\`\`\`\n${plan.substring(0, 65000)}\n\`\`\``;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });
+
+  plan-prod:
+    runs-on: ubuntu-latest
+    environment: prod
+    defaults:
+      run:
+        working-directory: live
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - run: terraform init -input=false
+      - run: terraform workspace select "${{ vars.TF_WORKSPACE }}" || terraform workspace new "${{ vars.TF_WORKSPACE }}"
+      - run: terraform validate
+      - run: terraform plan -input=false -no-color -var-file="${{ vars.TFVARS_FILE }}" -out=tfplan
+      - run: terraform show -no-color tfplan > plan.txt
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('live/plan.txt', 'utf8');
+            const body = `## Terraform Plan (prod workspace: ${{ vars.TF_WORKSPACE }})\n\n\`\`\`\n${plan.substring(0, 65000)}\n\`\`\``;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });
